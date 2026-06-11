@@ -152,7 +152,7 @@ const App = (function() {
             AppData.setState(state);
             if (selectedBattlefield) {
                 const map = BattlefieldMap.getMap();
-                SupplyVisualization.toggle(map, e.target.checked);
+                LogisticsAnalyzer.toggle(map, e.target.checked);
             }
         });
         document.getElementById('toggle-structures').addEventListener('change', (e) => {
@@ -160,7 +160,7 @@ const App = (function() {
             AppData.setState(state);
             if (selectedBattlefield) {
                 const map = BattlefieldMap.getMap();
-                DefenseVisualization.toggleStructures(map, e.target.checked);
+                DefenseEvaluator.toggleStructures(map, e.target.checked);
             }
         });
         document.getElementById('toggle-blindzones').addEventListener('change', (e) => {
@@ -168,7 +168,7 @@ const App = (function() {
             AppData.setState(state);
             if (selectedBattlefield) {
                 const map = BattlefieldMap.getMap();
-                DefenseVisualization.toggleBlindZones(map, e.target.checked);
+                DefenseEvaluator.toggleBlindZones(map, e.target.checked);
             }
         });
 
@@ -178,7 +178,7 @@ const App = (function() {
                 return;
             }
             const map = BattlefieldMap.getMap();
-            BattleReplay.initUI(map, selectedBattlefield);
+            BattleReplayer.initUI(map, selectedBattlefield);
         });
         document.getElementById('btn-supply').addEventListener('click', () => {
             if (!selectedBattlefield) {
@@ -186,7 +186,7 @@ const App = (function() {
                 return;
             }
             const map = BattlefieldMap.getMap();
-            SupplyVisualization.initUI(map, selectedBattlefield);
+            LogisticsAnalyzer.initUI(map, selectedBattlefield);
             state.showSupply = true;
             AppData.setState(state);
         });
@@ -196,14 +196,14 @@ const App = (function() {
                 return;
             }
             const map = BattlefieldMap.getMap();
-            DefenseVisualization.initUI(map, selectedBattlefield);
+            DefenseEvaluator.initUI(map, selectedBattlefield);
             state.showStructures = true;
             state.showBlindzones = true;
             AppData.setState(state);
         });
         document.getElementById('btn-doctrine').addEventListener('click', () => {
             const map = BattlefieldMap.getMap();
-            DoctrineEvolution.initUI(map);
+            TacticalEvolution.initUI(map);
         });
     }
 
@@ -397,14 +397,14 @@ const App = (function() {
 
         const bEventsDiv = document.getElementById('battle-events');
         if (bEventsDiv) {
-            BattleReplay.getEventsForBattle(bf.id, bf, function(data) {
+            BattleReplayer.getEventsForBattle(bf.id, bf, function(data) {
                 if (data && data.events && data.events.length) {
                     bEventsDiv.innerHTML = data.events.map(function(ev) {
                         var cls = 'event-item';
                         if (ev.is_turning_point) cls += ' turning-point';
                         if (ev.is_decision) cls += ' decision';
                         return '<div class="' + cls + '">' +
-                            '<span class="event-time">' + BattleReplay.formatHour(ev.hour_offset) + '</span>' +
+                            '<span class="event-time">' + BattleReplayer.formatHour(ev.hour_offset) + '</span>' +
                             '<span class="event-name">' + ev.event_name + '</span>' +
                             '<span class="event-type-tag">' + ev.event_type + '</span>' +
                             (ev.is_turning_point ? '<span class="event-type-tag" style="background:#e74c3c;color:#fff">转折点</span>' : '') +
@@ -439,9 +439,9 @@ const App = (function() {
     function closePanel() {
         document.getElementById('detail-panel').classList.remove('active');
         const map = BattlefieldMap.getMap();
-        BattleReplay.reset(map);
-        SupplyVisualization.reset(map);
-        DefenseVisualization.reset(map);
+        BattleReplayer.reset(map);
+        LogisticsAnalyzer.reset(map);
+        DefenseEvaluator.reset(map);
         state.showSupply = false;
         state.showStructures = false;
         state.showBlindzones = false;
