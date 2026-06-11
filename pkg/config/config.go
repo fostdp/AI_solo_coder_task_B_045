@@ -15,10 +15,10 @@ type ModelConfig struct {
 	HighProbArea       HPConfig       `yaml:"high_prob_area"`
 	TerrainProfile     TPConfig       `yaml:"terrain_profile"`
 	Accessibility      AccessConfig   `yaml:"accessibility"`
-	BattleReplay       ReplayConfig   `yaml:"battle_replay"`
-	SupplyAnalysis     SupplyConfig   `yaml:"supply_analysis"`
-	DefenseEvaluation  DefenseConfig  `yaml:"defense_evaluation"`
-	DoctrineEvolution  EvolutionConfig `yaml:"doctrine_evolution"`
+	BattleReplayer     ReplayConfig   `yaml:"battle_replay"`
+	LogisticsAnalyzer  SupplyConfig   `yaml:"logistics_analysis"`
+	DefenseEvaluator   DefenseConfig  `yaml:"defense_evaluation"`
+	TacticalEvolution  EvolutionConfig `yaml:"tactical_evolution"`
 }
 
 type ReplayConfig struct {
@@ -134,26 +134,26 @@ var DefaultConfig = ModelConfig{
 	Accessibility: AccessConfig{
 		DecayRate: 0.05,
 	},
-	BattleReplay: ReplayConfig{
+	BattleReplayer: ReplayConfig{
 		DefaultFps:   12,
 		MinEvents:    5,
 		MaxEvents:    10,
 		NLPConfidenceThreshold: 0.6,
 	},
-	SupplyAnalysis: SupplyConfig{
+	LogisticsAnalyzer: SupplyConfig{
 		NodesPerSide:       4,
 		DefaultSpeedKmh:    15.0,
 		WorkingHoursPerDay: 12.0,
 		BottleneckPct:      0.3,
 	},
-	DefenseEvaluation: DefenseConfig{
+	DefenseEvaluator: DefenseConfig{
 		DefaultViewshedKm:  8.0,
 		BlindZoneThreshold: 0.5,
 		NumDirections:      36,
 		StructureCountMin:  3,
 		StructureCountMax:  5,
 	},
-	DoctrineEvolution: EvolutionConfig{
+	TacticalEvolution: EvolutionConfig{
 		ChangePointWindow:  5,
 		SampleAnimationYears: 24,
 		TimeSeriesStep:     5,
