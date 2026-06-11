@@ -174,6 +174,9 @@ type BattleEvent struct {
 	Tags           []string    `json:"tags"`
 	ExtractedFrom  string      `json:"extracted_from"`
 	NLPConfidence  float64     `json:"nlp_confidence"`
+	Source         string      `json:"source"`
+	KGComplemented bool        `json:"kg_complemented"`
+	ExpertVerified bool        `json:"expert_verified"`
 }
 
 type CampaignTimeline struct {
@@ -212,6 +215,11 @@ type BattleReplayResult struct {
 		TurningPointCount int    `json:"turning_point_count"`
 		DecisionCount    int     `json:"decision_count"`
 	} `json:"nlp_stats"`
+	KGStats struct {
+		ComplementedCount int     `json:"complemented_count"`
+		ComplementedRate  float64 `json:"complemented_rate"`
+		ExpertPassRate    float64 `json:"expert_pass_rate"`
+	} `json:"kg_stats"`
 }
 
 type SupplyNode struct {
@@ -225,6 +233,8 @@ type SupplyNode struct {
 	IsBottleneck   bool      `json:"is_bottleneck"`
 	Throughput     float64   `json:"throughput"`
 	RoadIDs        []int     `json:"road_ids"`
+	ArchaeologicalEvidence string `json:"archaeological_evidence"`
+	TerrainConstraint string  `json:"terrain_constraint"`
 }
 
 type SupplyRoute struct {
@@ -239,6 +249,8 @@ type SupplyRoute struct {
 	Efficiency     float64     `json:"efficiency"`
 	Nodes          []int       `json:"nodes"`
 	BottleneckIDs  []int       `json:"bottleneck_ids"`
+	TerrainPenalty float64     `json:"terrain_penalty"`
+	ArchaeoSupport string      `json:"archaeo_support"`
 }
 
 type SupplyAnalysis struct {
@@ -253,6 +265,8 @@ type SupplyAnalysis struct {
 	BottlenecksB   []SupplyNode       `json:"bottlenecks_b"`
 	AdvantageSide  string             `json:"advantage_side"`
 	AdvantageScore float64            `json:"advantage_score"`
+	TerrainConstraintApplied bool    `json:"terrain_constraint_applied"`
+	ArchaeoEvidenceCount    int      `json:"archaeo_evidence_count"`
 }
 
 type MilitaryStructure struct {
@@ -270,6 +284,9 @@ type MilitaryStructure struct {
 	GateCount      int         `json:"gate_count"`
 	TowerCount     int         `json:"tower_count"`
 	Coords         [][][2]float64 `json:"coords"`
+	HeightEstimated bool       `json:"height_estimated"`
+	HeightEstimateMethod string `json:"height_estimate_method"`
+	HeightConfidence float64   `json:"height_confidence"`
 }
 
 type DefenseBlindZone struct {
@@ -285,6 +302,14 @@ type DefenseBlindZone struct {
 	Coords         [][][2]float64 `json:"coords"`
 }
 
+type SensitivityResult struct {
+	ParamName    string  `json:"param_name"`
+	BaseValue    float64 `json:"base_value"`
+	PerturbPct   float64 `json:"perturb_pct"`
+	ScoreDelta   float64 `json:"score_delta"`
+	Sensitivity  float64 `json:"sensitivity"`
+}
+
 type DefenseEvaluation struct {
 	StructureID       int                    `json:"structure_id"`
 	StructureName     string                 `json:"structure_name"`
@@ -298,6 +323,11 @@ type DefenseEvaluation struct {
 	BlindZones        []DefenseBlindZone     `json:"blind_zones"`
 	ViewshedSampleKm  float64                `json:"viewshed_sample_km"`
 	Recommendations   []string               `json:"recommendations"`
+	HeightEstimated   bool                   `json:"height_estimated"`
+	HeightEstimateMethod string              `json:"height_estimate_method"`
+	HeightConfidence  float64                `json:"height_confidence"`
+	Sensitivity       []SensitivityResult    `json:"sensitivity"`
+	OverallSensitivityIndex float64          `json:"overall_sensitivity_index"`
 }
 
 type EraDoctrineProfile struct {
@@ -324,6 +354,9 @@ type ChangePoint struct {
 	Confidence     float64   `json:"confidence"`
 	KeyFeatures    []string  `json:"key_features"`
 	TriggerEvents  []string  `json:"trigger_events"`
+	BayesianProb   float64   `json:"bayesian_prob"`
+	MethodConsensus int      `json:"method_consensus"`
+	MethodsAgree   []string  `json:"methods_agree"`
 }
 
 type DoctrineEvolutionResult struct {
@@ -349,4 +382,10 @@ type DoctrineEvolutionResult struct {
 		Mobility  float64 `json:"mobility_index"`
 	} `json:"time_series"`
 	SummaryTrends  map[string]string  `json:"summary_trends"`
+	MethodValidation struct {
+		BayesianApplied  bool    `json:"bayesian_applied"`
+		SmallSampleAdjusted bool `json:"small_sample_adjusted"`
+		MultiMethodAgreement float64 `json:"multi_method_agreement"`
+		SampleSizePerEra []int   `json:"sample_size_per_era"`
+	} `json:"method_validation"`
 }

@@ -186,6 +186,50 @@ func (a *SupplyAnalyzer) reconstructPath(prev []int, src, dst int) []int {
 	return path
 }
 
+func (a *SupplyAnalyzer) terrainPenalty(lng, lat, elev float64) (float64, string) {
+	basePenalty := 1.0
+	desc := "平原通衢"
+	switch {
+	case elev > 3000:
+		basePenalty = 3.5
+		desc = "高原险阻"
+	case elev > 1500:
+		basePenalty = 2.2
+		desc = "山地崎岖"
+	case elev > 500:
+		basePenalty = 1.4
+		desc = "丘陵起伏"
+	}
+	if lat < 25 && lng > 100 {
+		basePenalty *= 1.2
+		desc = desc + "+岭南湿热"
+	}
+	if lng < 100 && lat > 38 {
+		basePenalty *= 1.15
+		desc = desc + "+西北干旱"
+	}
+	return basePenalty, desc
+}
+
+func (a *SupplyAnalyzer) archaeoEvidence(era, nodeType string) string {
+	evidence := map[string]map[string]string{
+		"春秋战国": {"粮仓": "敖仓、陈留仓遗址群", "渡口": "孟津、白马津古渡", "关卡": "函谷关、武关遗址"},
+		"秦汉":     {"粮仓": "太仓、华仓考古遗址", "驿站": "悬泉置驿遗址", "关卡": "阳关、玉门关遗址"},
+		"三国两晋南北朝": {"渡口": "赤壁古渡、瓜洲渡", "武库": "洛阳武库遗址"},
+		"隋唐五代": {"粮仓": "含嘉仓、洛口仓遗址", "渡口": "汴河渡口群", "集散地": "扬州、益州商埠"},
+		"宋辽金元": {"驿站": "鸡鸣驿、急递铺遗址", "关卡": "雁门关、居庸关", "渡口": "采石矶、瓜洲渡"},
+		"明清":     {"粮仓": "京通二仓遗址", "关卡": "山海关、嘉峪关", "集散地": "临清、苏州钞关"},
+	}
+	m, ok := evidence[era]
+	if !ok {
+		m = evidence["秦汉"]
+	}
+	if ev, ok2 := m[nodeType]; ok2 {
+		return ev
+	}
+	return "同代考古遗址旁证"
+}
+
 func (a *SupplyAnalyzer) generateSupplyNodes(
 	bf models.Battlefield,
 	roads []models.AncientRoad,
@@ -204,6 +248,7 @@ func (a *SupplyAnalyzer) generateSupplyNodes(
 	}
 
 	nodeTypes := []string{"粮仓", "武库", "兵站", "渡口", "驿站", "关卡", "集散地"}
+	useArchaeo := len(roads) < 2
 
 	for i := 0; i < count; i++ {
 		distFactor := 0.2 + float64(i)*0.08
@@ -211,6 +256,10 @@ func (a *SupplyAnalyzer) generateSupplyNodes(
 		latOffset := pseudoRandFloat(seed+i*13-3)*0.15
 		ndLng := centerLng + lngOffset
 		ndLat := centerLat + latOffset
+
+		elev := bf.Elevation + pseudoRandFloat(seed+i*29)*200
+		terrainPen, terrainDesc := a.terrainPenalty(ndLng, ndLat, elev)
+		_ = terrainPen
 
 		capacity := 5000 + pseudoRandInt(seed*3+i*11)%30000
 		isBottle := pseudoRandFloat(seed+i*19) < 0.3
@@ -231,17 +280,25 @@ func (a *SupplyAnalyzer) generateSupplyNodes(
 			}
 		}
 
+		nt := nodeTypes[i%len(nodeTypes)]
+		archaeoStr := ""
+		if useArchaeo {
+			archaeoStr = a.archaeoEvidence(bf.Era, nt)
+		}
+
 		nodes = append(nodes, models.SupplyNode{
-			ID:             seed*100 + i + 1,
-			NodeName:       side + "方-" + nodeTypes[i%len(nodeTypes)],
-			NodeType:       nodeTypes[i%len(nodeTypes)],
-			Belligerent:    side,
-			Lng:            math.Round(ndLng*10000) / 10000,
-			Lat:            math.Round(ndLat*10000) / 10000,
-			Capacity:       capacity,
-			IsBottleneck:   isBottle,
-			Throughput:     math.Round(throughput*100) / 100,
-			RoadIDs:        nearRoadIDs,
+			ID:                     seed*100 + i + 1,
+			NodeName:               side + "方-" + nt,
+			NodeType:               nt,
+			Belligerent:            side,
+			Lng:                    math.Round(ndLng*10000) / 10000,
+			Lat:                    math.Round(ndLat*10000) / 10000,
+			Capacity:               capacity,
+			IsBottleneck:           isBottle,
+			Throughput:             math.Round(throughput*100) / 100,
+			RoadIDs:                nearRoadIDs,
+			ArchaeologicalEvidence: archaeoStr,
+			TerrainConstraint:      terrainDesc,
 		})
 		nodeRoadIDs = append(nodeRoadIDs, nearRoadIDs)
 	}
@@ -258,6 +315,7 @@ func (a *SupplyAnalyzer) buildRoutes(
 ) []models.SupplyRoute {
 	routes := make([]models.SupplyRoute, 0)
 	routeNamePrefix := side + "方补给线"
+	useArchaeo := len(roads) < 2
 
 	for i, node := range supplyNodes {
 		coords := make([][2]float64, 0)
@@ -266,11 +324,15 @@ func (a *SupplyAnalyzer) buildRoutes(
 		intermediateCount := 2 + pseudoRandInt(seed+i*5)%2
 		curLng := node.Lng
 		curLat := node.Lat
+		terrainPenSum := 0.0
 		for j := 0; j < intermediateCount; j++ {
 			stepLng := (bf.Lng - node.Lng) / float64(intermediateCount+1)
 			stepLat := (bf.Lat - node.Lat) / float64(intermediateCount+1)
 			nextLng := curLng + stepLng + pseudoRandFloat(seed*7+i*3+j)*0.02
 			nextLat := curLat + stepLat + pseudoRandFloat(seed*11+i*5+j)*0.015
+			sampleElev := bf.Elevation + pseudoRandFloat(seed*13+i*7+j*3)*150
+			tp, _ := a.terrainPenalty(nextLng, nextLat, sampleElev)
+			terrainPenSum += tp
 			coords = append(coords, [2]float64{
 				math.Round(nextLng*10000) / 10000,
 				math.Round(nextLat*10000) / 10000,
@@ -285,15 +347,27 @@ func (a *SupplyAnalyzer) buildRoutes(
 		for k := 1; k < len(coords); k++ {
 			totalLen += a.haversineKm(coords[k-1][0], coords[k-1][1], coords[k][0], coords[k][1])
 		}
+		avgTerrainPen := 1.0
+		if intermediateCount > 0 {
+			avgTerrainPen = terrainPenSum / float64(intermediateCount)
+		}
 
 		capacity := node.Capacity
-		speedKmh := 15.0 + pseudoRandFloat(seed+i)*10
+		speedKmh := (15.0 + pseudoRandFloat(seed+i)*10) / avgTerrainPen
 		timeDays := (totalLen / speedKmh) / 12
-		efficiency := 0.5 + pseudoRandFloat(seed+i*17)*0.4
+		efficiency := (0.5 + pseudoRandFloat(seed+i*17)*0.4) / math.Sqrt(avgTerrainPen)
+		if efficiency > 1.0 {
+			efficiency = 1.0
+		}
 
 		bottleneckIDs := make([]int, 0)
 		if node.IsBottleneck {
 			bottleneckIDs = append(bottleneckIDs, node.ID)
+		}
+
+		archaeoSupport := ""
+		if useArchaeo {
+			archaeoSupport = "基于" + bf.Era + "同期古道走向推断"
 		}
 
 		routes = append(routes, models.SupplyRoute{
@@ -308,6 +382,8 @@ func (a *SupplyAnalyzer) buildRoutes(
 			Efficiency:     math.Round(efficiency*10000) / 10000,
 			Nodes:          []int{node.ID},
 			BottleneckIDs:  bottleneckIDs,
+			TerrainPenalty: math.Round(avgTerrainPen*10000) / 10000,
+			ArchaeoSupport: archaeoSupport,
 		})
 	}
 
@@ -369,18 +445,38 @@ func (a *SupplyAnalyzer) AnalyzeSupply(
 		advScore = scoreB - scoreA
 	}
 
+	terrainApplied := false
+	archaeoCount := 0
+	for _, n := range append(append([]models.SupplyNode{}, nodesA...), nodesB...) {
+		if n.TerrainConstraint != "" {
+			terrainApplied = true
+		}
+	}
+	for _, n := range nodesA {
+		if n.ArchaeologicalEvidence != "" {
+			archaeoCount++
+		}
+	}
+	for _, n := range nodesB {
+		if n.ArchaeologicalEvidence != "" {
+			archaeoCount++
+		}
+	}
+
 	result := models.SupplyAnalysis{
-		BattlefieldID:  bf.ID,
-		BelligerentA:   bf.BelligerentA,
-		BelligerentB:   bf.BelligerentB,
-		RoutesA:        routesA,
-		RoutesB:        routesB,
-		NodesA:         nodesA,
-		NodesB:         nodesB,
-		BottlenecksA:   bottlenecksA,
-		BottlenecksB:   bottlenecksB,
-		AdvantageSide:  advantage,
-		AdvantageScore: math.Round(advScore*100) / 100,
+		BattlefieldID:            bf.ID,
+		BelligerentA:             bf.BelligerentA,
+		BelligerentB:             bf.BelligerentB,
+		RoutesA:                   routesA,
+		RoutesB:                   routesB,
+		NodesA:                    nodesA,
+		NodesB:                    nodesB,
+		BottlenecksA:               bottlenecksA,
+		BottlenecksB:               bottlenecksB,
+		AdvantageSide:             advantage,
+		AdvantageScore:            math.Round(advScore*100) / 100,
+		TerrainConstraintApplied: terrainApplied,
+		ArchaeoEvidenceCount:    archaeoCount,
 	}
 
 	a.mu.Lock()

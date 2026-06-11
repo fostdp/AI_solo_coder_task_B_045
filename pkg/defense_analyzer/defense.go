@@ -86,6 +86,36 @@ var structureTemplates = map[string][]struct {
 	},
 }
 
+func (a *DefenseAnalyzer) estimateHeight(structureType, dynasty string) (float64, string, float64) {
+	dynastyBase := map[string]float64{
+		"春秋战国": 1.0, "秦汉": 1.1, "三国": 1.15, "两晋": 1.1, "南北朝": 1.1,
+		"隋": 1.2, "唐": 1.3, "五代": 1.25, "宋": 1.3, "辽": 1.25, "金": 1.3, "元": 1.35,
+		"明": 1.5, "清": 1.4,
+	}
+	typeBase := map[string]float64{
+		"城墙": 10, "关隘": 8, "堡垒": 6, "烽火台": 12, "要塞": 11, "寨堡": 5, "护城河": 3,
+	}
+	db := 1.2
+	for k, v := range dynastyBase {
+		if len(dynasty) >= len(k) && dynasty[:len(k)] == k {
+			db = v
+			break
+		}
+	}
+	tb, ok := typeBase[structureType]
+	if !ok {
+		tb = 7
+	}
+	confidence := 0.7
+	if db != 1.2 {
+		confidence += 0.1
+	}
+	if ok {
+		confidence += 0.1
+	}
+	return tb * db, "基于" + dynasty + "/" + structureType + "考古均值回归", confidence
+}
+
 func (a *DefenseAnalyzer) GenerateMilitaryStructures(bf models.Battlefield) []models.MilitaryStructure {
 	seed := bf.ID
 	result := make([]models.MilitaryStructure, 0)
@@ -125,21 +155,33 @@ func (a *DefenseAnalyzer) GenerateMilitaryStructures(bf models.Battlefield) []mo
 		heightVar := 0.8 + pseudoRandFloat(seed+i*19)*0.4
 		lengthVar := 0.7 + pseudoRandFloat(seed+i*23)*0.6
 
+		rawHeight := tpl.Height * heightVar
+		estimated := false
+		estMethod := ""
+		estConf := 1.0
+		if rawHeight < 1.0 {
+			estimated = true
+			rawHeight, estMethod, estConf = a.estimateHeight(tpl.Type, bf.Dynasty)
+		}
+
 		result = append(result, models.MilitaryStructure{
-			ID:             seed*100 + i + 1,
-			StructureName:  bf.BattleName + "-" + tpl.Name,
-			StructureType:  tpl.Type,
-			BattlefieldID:  bf.ID,
-			Dynasty:        bf.Dynasty,
-			Lng:            math.Round(lng*10000) / 10000,
-			Lat:            math.Round(lat*10000) / 10000,
-			HeightM:        math.Round(tpl.Height*heightVar*100) / 100,
-			LengthM:        math.Round(tpl.Length*lengthVar*100) / 100,
-			ThicknessM:     math.Round(tpl.Thickness*100) / 100,
-			Material:       tpl.Material,
-			GateCount:      tpl.Gates,
-			TowerCount:     tpl.Towers,
-			Coords:         coords,
+			ID:                   seed*100 + i + 1,
+			StructureName:         bf.BattleName + "-" + tpl.Name,
+			StructureType:         tpl.Type,
+			BattlefieldID:         bf.ID,
+			Dynasty:               bf.Dynasty,
+			Lng:                   math.Round(lng*10000) / 10000,
+			Lat:                   math.Round(lat*10000) / 10000,
+			HeightM:               math.Round(rawHeight*100) / 100,
+			LengthM:               math.Round(tpl.Length*lengthVar*100) / 100,
+			ThicknessM:            math.Round(tpl.Thickness*100) / 100,
+			Material:              tpl.Material,
+			GateCount:             tpl.Gates,
+			TowerCount:            tpl.Towers,
+			Coords:                coords,
+			HeightEstimated:       estimated,
+			HeightEstimateMethod:  estMethod,
+			HeightConfidence:      math.Round(estConf*10000) / 10000,
 		})
 	}
 
@@ -409,19 +451,74 @@ func (a *DefenseAnalyzer) EvaluateStructure(
 	overall := math.Round((visibility*0.4+structural*0.3+topographic*0.3)*10000) / 10000
 	recs := a.makeRecommendations(blindZones, structural, topographic, avgVis)
 
+	sensitivity := make([]models.SensitivityResult, 0)
+	totalSensIdx := 0.0
+
+	perturbParams := []struct {
+		name     string
+		baseVal  float64
+		perturbP float64
+	}{
+		{"城墙高度", structure.HeightM, 0.2},
+		{"视距采样", viewshedSampleKm, 0.2},
+		{"城墙厚度", structure.ThicknessM, 0.2},
+	}
+	for _, p := range perturbParams {
+		if p.baseVal <= 0 {
+			continue
+		}
+		upStruct := structure
+		upKm := viewshedSampleKm
+		switch p.name {
+		case "城墙高度":
+			upStruct.HeightM = p.baseVal * (1 + p.perturbP)
+		case "视距采样":
+			upKm = p.baseVal * (1 + p.perturbP)
+		case "城墙厚度":
+			upStruct.ThicknessM = p.baseVal * (1 + p.perturbP)
+		}
+		_, upVis := a.computeViewshed(upStruct, upKm)
+		upStr := a.structuralScore(upStruct)
+		upTop := a.topographicScore(upStruct, bf)
+		upOverall := upVis*0.4 + upStr*0.3 + upTop*0.3
+
+		delta := math.Abs(upOverall - overall)
+		sens := 0.0
+		if p.perturbP > 0 {
+			sens = delta / p.perturbP
+		}
+		sensitivity = append(sensitivity, models.SensitivityResult{
+			ParamName:   p.name,
+			BaseValue:   p.baseVal,
+			PerturbPct:  p.perturbP,
+			ScoreDelta:  math.Round(delta*10000) / 10000,
+			Sensitivity: math.Round(sens*10000) / 10000,
+		})
+		totalSensIdx += sens
+	}
+
+	estFlag := structure.HeightEstimated
+	estMethod := structure.HeightEstimateMethod
+	estConf := structure.HeightConfidence
+
 	result := models.DefenseEvaluation{
-		StructureID:       structure.ID,
-		StructureName:     structure.StructureName,
-		OverallScore:      overall,
-		VisibilityScore:   visibility,
-		StructuralScore:   structural,
-		TopographicScore:  topographic,
-		BlindZoneCount:    len(blindZones),
-		TotalBlindAreaKm2: math.Round(totalArea*10000) / 10000,
-		AvgVisibilityPct:  avgVis,
-		BlindZones:        blindZones,
-		ViewshedSampleKm:  viewshedSampleKm,
-		Recommendations:   recs,
+		StructureID:          structure.ID,
+		StructureName:         structure.StructureName,
+		OverallScore:          overall,
+		VisibilityScore:       visibility,
+		StructuralScore:       structural,
+		TopographicScore:      topographic,
+		BlindZoneCount:        len(blindZones),
+		TotalBlindAreaKm2:     math.Round(totalArea*10000) / 10000,
+		AvgVisibilityPct:      avgVis,
+		BlindZones:            blindZones,
+		ViewshedSampleKm:      viewshedSampleKm,
+		Recommendations:       recs,
+		HeightEstimated:       estFlag,
+		HeightEstimateMethod:  estMethod,
+		HeightConfidence:      estConf,
+		Sensitivity:           sensitivity,
+		OverallSensitivityIndex: math.Round(totalSensIdx*10000) / 10000,
 	}
 
 	a.mu.Lock()

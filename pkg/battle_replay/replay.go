@@ -154,14 +154,133 @@ func (a *ReplayAnalyzer) NLPExtractEvents(bf models.Battlefield) []models.Battle
 			Tags:           tpl.Tags,
 			ExtractedFrom:  fmt.Sprintf("模拟战史文本: %s", bf.BattleName),
 			NLPConfidence:  math.Round(confidence*10000) / 10000,
+			Source:         "nlp_extract",
+			KGComplemented: false,
+			ExpertVerified: false,
 		})
 	}
+
+	events = a.kgComplement(bf, events, templates)
+	events = a.expertValidate(bf, events)
 
 	sort.Slice(events, func(i, j int) bool {
 		return events[i].HourOffset < events[j].HourOffset
 	})
 	for i := range events {
 		events[i].EventOrder = i + 1
+		events[i].ID = int(int64(bf.ID)*1000 + int64(i) + 1)
+	}
+
+	return events
+}
+
+func (a *ReplayAnalyzer) kgComplement(
+	bf models.Battlefield,
+	events []models.BattleEvent,
+	templates []struct {
+		Type        string
+		Name        string
+		Description string
+		Tags        []string
+		Turning     bool
+		Decision    bool
+	},
+) []models.BattleEvent {
+	expectedTypes := map[string]bool{"部署": true, "交战": true, "决战": true}
+	hasType := map[string]bool{}
+	for _, ev := range events {
+		hasType[ev.EventType] = true
+	}
+
+	missingIdx := len(events)
+	baseLng := bf.Lng
+	baseLat := bf.Lat
+
+	for _, tpl := range templates {
+		if expectedTypes[tpl.Type] && !hasType[tpl.Type] {
+			offsetR := 0.05 + pseudoRandFloat(int(bf.ID)+missingIdx*29)*0.15
+			offsetTheta := pseudoRandFloat(int(bf.ID)*41+missingIdx*13) * 2 * math.Pi
+			evLng := baseLng + offsetR*math.Cos(offsetTheta)
+			evLat := baseLat + offsetR*math.Sin(offsetTheta)*0.8
+			confidence := 0.65 + pseudoRandFloat(int(bf.ID)*53+missingIdx*17)*0.15
+			troopFrac := 0.2 + pseudoRandFloat(int(bf.ID)*59+missingIdx*19)*0.5
+			troops := int(float64(bf.TotalTroops) * troopFrac / 2)
+
+			events = append(events, models.BattleEvent{
+				BattlefieldID:  bf.ID,
+				EventType:      tpl.Type,
+				EventName:      tpl.Name,
+				Description:    tpl.Description,
+				HourOffset:     float64(missingIdx) * 3.5,
+				Lng:            math.Round(evLng*10000) / 10000,
+				Lat:            math.Round(evLat*10000) / 10000,
+				Belligerent:    []string{bf.BelligerentA, bf.BelligerentB}[missingIdx%2],
+				TroopCount:     troops,
+				Casualties:     int(float64(troops) * 0.2),
+				IsTurningPoint: tpl.Turning,
+				IsDecision:     tpl.Decision,
+				Tags:           tpl.Tags,
+				ExtractedFrom:  fmt.Sprintf("知识图谱补全: %s/%s", bf.Era, tpl.Type),
+				NLPConfidence:  math.Round(confidence*10000) / 10000,
+				Source:         "knowledge_graph",
+				KGComplemented: true,
+				ExpertVerified: false,
+			})
+			missingIdx++
+		}
+	}
+
+	return events
+}
+
+func (a *ReplayAnalyzer) expertValidate(bf models.Battlefield, events []models.BattleEvent) []models.BattleEvent {
+	hasTurning := false
+	hasDecision := false
+	hasDeploy := false
+	for i := range events {
+		if events[i].IsTurningPoint {
+			hasTurning = true
+		}
+		if events[i].IsDecision {
+			hasDecision = true
+		}
+		if events[i].EventType == "部署" {
+			hasDeploy = true
+		}
+		if events[i].TroopCount < 0 {
+			events[i].TroopCount = 0
+		}
+		if events[i].Casualties < 0 {
+			events[i].Casualties = 0
+		}
+		if events[i].HourOffset < 0 {
+			events[i].HourOffset = 0
+		}
+		if events[i].NLPConfidence > 1.0 {
+			events[i].NLPConfidence = 0.95
+		}
+		if events[i].NLPConfidence < 0 {
+			events[i].NLPConfidence = 0.5
+		}
+		events[i].ExpertVerified = true
+	}
+
+	if !hasTurning && len(events) > 0 {
+		idx := len(events) / 2
+		events[idx].IsTurningPoint = true
+		events[idx].Tags = append(events[idx].Tags, "专家补标_转折点")
+	}
+	if !hasDecision && len(events) > 1 {
+		idx := len(events)/2 - 1
+		if idx < 0 {
+			idx = 0
+		}
+		events[idx].IsDecision = true
+		events[idx].Tags = append(events[idx].Tags, "专家补标_决策点")
+	}
+	if !hasDeploy && len(events) > 0 {
+		events[0].EventType = "部署"
+		events[0].Tags = append(events[0].Tags, "专家修正_部署阶段")
 	}
 
 	return events
@@ -331,13 +450,27 @@ func (a *ReplayAnalyzer) GenerateBattleReplay(bf models.Battlefield, fps int) mo
 	frames := a.GenerateAnimationFrames(bf, timeline, fps)
 
 	avgConf := 0.0
+	kgCount := 0
+	expertPass := 0
 	for _, ev := range events {
 		avgConf += ev.NLPConfidence
+		if ev.KGComplemented {
+			kgCount++
+		}
+		if ev.ExpertVerified {
+			expertPass++
+		}
 	}
 	if len(events) > 0 {
 		avgConf /= float64(len(events))
 	}
 	avgConf = math.Round(avgConf*10000) / 10000
+	kgRate := 0.0
+	expertRate := 0.0
+	if len(events) > 0 {
+		kgRate = math.Round(float64(kgCount)/float64(len(events))*10000) / 10000
+		expertRate = math.Round(float64(expertPass)/float64(len(events))*10000) / 10000
+	}
 
 	tpCount := 0
 	dcCount := 0
@@ -360,6 +493,9 @@ func (a *ReplayAnalyzer) GenerateBattleReplay(bf models.Battlefield, fps int) mo
 	result.NLPStats.AvgConfidence = avgConf
 	result.NLPStats.TurningPointCount = tpCount
 	result.NLPStats.DecisionCount = dcCount
+	result.KGStats.ComplementedCount = kgCount
+	result.KGStats.ComplementedRate = kgRate
+	result.KGStats.ExpertPassRate = expertRate
 
 	a.mu.Lock()
 	a.lastResult[bf.ID] = &result
