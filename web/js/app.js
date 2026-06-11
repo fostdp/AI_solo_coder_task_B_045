@@ -7,6 +7,9 @@ const App = (function() {
         showRivers: true,
         showRegions: false,
         showHighProb: false,
+        showSupply: false,
+        showStructures: false,
+        showBlindzones: false,
         filterEra: '',
         filterTerrain: '',
         minTroops: 0,
@@ -143,6 +146,65 @@ const App = (function() {
                 showDetailPanel(selectedBattlefield);
             }
         });
+
+        document.getElementById('toggle-supply').addEventListener('change', (e) => {
+            state.showSupply = e.target.checked;
+            AppData.setState(state);
+            if (selectedBattlefield) {
+                const map = BattlefieldMap.getMap();
+                SupplyVisualization.toggle(map, e.target.checked);
+            }
+        });
+        document.getElementById('toggle-structures').addEventListener('change', (e) => {
+            state.showStructures = e.target.checked;
+            AppData.setState(state);
+            if (selectedBattlefield) {
+                const map = BattlefieldMap.getMap();
+                DefenseVisualization.toggleStructures(map, e.target.checked);
+            }
+        });
+        document.getElementById('toggle-blindzones').addEventListener('change', (e) => {
+            state.showBlindzones = e.target.checked;
+            AppData.setState(state);
+            if (selectedBattlefield) {
+                const map = BattlefieldMap.getMap();
+                DefenseVisualization.toggleBlindZones(map, e.target.checked);
+            }
+        });
+
+        document.getElementById('btn-replay').addEventListener('click', () => {
+            if (!selectedBattlefield) {
+                alert('请先在地图上选择一个战场');
+                return;
+            }
+            const map = BattlefieldMap.getMap();
+            BattleReplay.initUI(map, selectedBattlefield);
+        });
+        document.getElementById('btn-supply').addEventListener('click', () => {
+            if (!selectedBattlefield) {
+                alert('请先在地图上选择一个战场');
+                return;
+            }
+            const map = BattlefieldMap.getMap();
+            SupplyVisualization.initUI(map, selectedBattlefield);
+            state.showSupply = true;
+            AppData.setState(state);
+        });
+        document.getElementById('btn-defense').addEventListener('click', () => {
+            if (!selectedBattlefield) {
+                alert('请先在地图上选择一个战场');
+                return;
+            }
+            const map = BattlefieldMap.getMap();
+            DefenseVisualization.initUI(map, selectedBattlefield);
+            state.showStructures = true;
+            state.showBlindzones = true;
+            AppData.setState(state);
+        });
+        document.getElementById('btn-doctrine').addEventListener('click', () => {
+            const map = BattlefieldMap.getMap();
+            DoctrineEvolution.initUI(map);
+        });
     }
 
     function applyFilters() {
@@ -196,6 +258,25 @@ const App = (function() {
     function formatTroops(n) {
         if (n >= 10000) return (n / 10000).toFixed(0) + '万';
         return n.toString();
+    }
+
+    function renderAccessibilityInfo(acc) {
+        const container = document.getElementById('accessibility-info');
+        if (!container) return;
+        container.innerHTML = `
+            <div class="access-score">
+                <span class="access-label">交通可达性综合评分</span>
+                <span class="access-value">${acc.access_level} (${acc.access_score.toFixed(2)})</span>
+            </div>
+            <div class="access-item">
+                <span class="access-label">最近道路距离</span>
+                <span class="access-value">${acc.nearest_road_dist.toFixed(1)} km</span>
+            </div>
+            <div class="access-item">
+                <span class="access-label">交通连通指数</span>
+                <span class="access-value">${acc.connectivity_index.toFixed(1)}</span>
+            </div>
+        `;
     }
 
     async function loadFactorAnalysis() {
@@ -306,26 +387,42 @@ const App = (function() {
 
         document.getElementById('detail-name').textContent = bf.battle_name;
         document.getElementById('detail-era').textContent = bf.era;
-        document.getElementById('detail-year').textContent = formatYear(bf.year);
-        document.getElementById('detail-sides').textContent = `${bf.belligerent_a} vs ${bf.belligerent_b}`;
-        document.getElementById('detail-troops').textContent = `${formatTroops(bf.troops_a)} vs ${formatTroops(bf.troops_b)} (共${formatTroops(bf.total_troops)})`;
+        document.getElementById('detail-dynasty').textContent = bf.dynasty || '-';
+        document.getElementById('detail-year').textContent = formatYear(bf.battle_year);
+        document.getElementById('detail-belligerents').textContent = `${bf.belligerent_a} vs ${bf.belligerent_b}`;
+        document.getElementById('detail-troops').textContent = `${formatTroops(bf.troop_a)} vs ${formatTroops(bf.troop_b)} (共${formatTroops(bf.total_troops)})`;
         document.getElementById('detail-terrain').textContent = bf.terrain_type;
-        document.getElementById('detail-elev').textContent = bf.elevation + ' m';
-        document.getElementById('detail-outcome').textContent = bf.outcome;
+        document.getElementById('detail-elevation').textContent = bf.elevation + ' m';
+        document.getElementById('detail-result').textContent = bf.result;
+
+        const bEventsDiv = document.getElementById('battle-events');
+        if (bEventsDiv) {
+            BattleReplay.getEventsForBattle(bf.id, bf, function(data) {
+                if (data && data.events && data.events.length) {
+                    bEventsDiv.innerHTML = data.events.map(function(ev) {
+                        var cls = 'event-item';
+                        if (ev.is_turning_point) cls += ' turning-point';
+                        if (ev.is_decision) cls += ' decision';
+                        return '<div class="' + cls + '">' +
+                            '<span class="event-time">' + BattleReplay.formatHour(ev.hour_offset) + '</span>' +
+                            '<span class="event-name">' + ev.event_name + '</span>' +
+                            '<span class="event-type-tag">' + ev.event_type + '</span>' +
+                            (ev.is_turning_point ? '<span class="event-type-tag" style="background:#e74c3c;color:#fff">转折点</span>' : '') +
+                            (ev.is_decision ? '<span class="event-type-tag" style="background:#3498db;color:#fff">决策</span>' : '') +
+                            '</div>';
+                    }).join('');
+                }
+            });
+        }
 
         try {
             const acc = await fetchWithFallback(
                 `/api/accessibility/${bf.id}`,
                 () => generateMockAccessibility(bf)
             );
-            document.getElementById('detail-acc').textContent = `${acc.access_level} (分数: ${acc.access_score.toFixed(2)})`;
-            document.getElementById('detail-road-dist').textContent = acc.nearest_road_dist.toFixed(1) + ' km';
-            document.getElementById('detail-connect').textContent = acc.connectivity_index.toFixed(1);
+            renderAccessibilityInfo(acc);
         } catch (e) {
-            const mock = generateMockAccessibility(bf);
-            document.getElementById('detail-acc').textContent = `${mock.access_level} (分数: ${mock.access_score.toFixed(2)})`;
-            document.getElementById('detail-road-dist').textContent = mock.nearest_road_dist.toFixed(1) + ' km';
-            document.getElementById('detail-connect').textContent = mock.connectivity_index.toFixed(1);
+            renderAccessibilityInfo(generateMockAccessibility(bf));
         }
 
         try {
@@ -341,6 +438,17 @@ const App = (function() {
 
     function closePanel() {
         document.getElementById('detail-panel').classList.remove('active');
+        const map = BattlefieldMap.getMap();
+        BattleReplay.reset(map);
+        SupplyVisualization.reset(map);
+        DefenseVisualization.reset(map);
+        state.showSupply = false;
+        state.showStructures = false;
+        state.showBlindzones = false;
+        AppData.setState(state);
+        document.getElementById('toggle-supply').checked = false;
+        document.getElementById('toggle-structures').checked = false;
+        document.getElementById('toggle-blindzones').checked = false;
         selectedBattlefield = null;
         BattlefieldMap.setSelected(null);
     }

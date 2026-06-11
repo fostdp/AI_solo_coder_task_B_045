@@ -110,3 +110,120 @@ CREATE TABLE site_selection_factor (
     method VARCHAR(50) NOT NULL DEFAULT '逻辑回归',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- ==================== 战役事件表（战役进程时空回放） ====================
+DROP TABLE IF EXISTS battle_event CASCADE;
+CREATE TABLE battle_event (
+    id SERIAL PRIMARY KEY,
+    battlefield_id INT NOT NULL REFERENCES battlefield(id) ON DELETE CASCADE,
+    event_order INT NOT NULL,
+    event_type VARCHAR(50) NOT NULL CHECK (event_type IN ('部署', '进军', '交战', '伏击', '突围', '撤退', '决策', '补给', '决战', '其他')),
+    event_name VARCHAR(200) NOT NULL,
+    description TEXT,
+    hour_offset NUMERIC(8, 2) NOT NULL DEFAULT 0,
+    geom GEOMETRY(Point, 4326),
+    belligerent VARCHAR(100),
+    troop_count INT DEFAULT 0,
+    casualties INT DEFAULT 0,
+    is_turning_point BOOLEAN DEFAULT FALSE,
+    is_decision BOOLEAN DEFAULT FALSE,
+    tags TEXT[],
+    extracted_from TEXT,
+    nlp_confidence NUMERIC(5, 4) DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_battle_event_bfid ON battle_event(battlefield_id);
+CREATE INDEX idx_battle_event_geom ON battle_event USING GIST(geom);
+CREATE INDEX idx_battle_event_order ON battle_event(battlefield_id, event_order);
+
+-- ==================== 后勤补给节点与路线表 ====================
+DROP TABLE IF EXISTS supply_node CASCADE;
+CREATE TABLE supply_node (
+    id SERIAL PRIMARY KEY,
+    node_name VARCHAR(200) NOT NULL,
+    node_type VARCHAR(50) NOT NULL CHECK (node_type IN ('粮仓', '武库', '兵站', '渡口', '驿站', '关卡', '集散地')),
+    belligerent VARCHAR(100) NOT NULL,
+    geom GEOMETRY(Point, 4326),
+    capacity INT DEFAULT 0,
+    is_bottleneck BOOLEAN DEFAULT FALSE,
+    throughput NUMERIC(10, 2) DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_supply_node_geom ON supply_node USING GIST(geom);
+CREATE INDEX idx_supply_node_belligerent ON supply_node(belligerent);
+
+DROP TABLE IF EXISTS supply_route CASCADE;
+CREATE TABLE supply_route (
+    id SERIAL PRIMARY KEY,
+    route_name VARCHAR(200) NOT NULL,
+    belligerent VARCHAR(100) NOT NULL,
+    geom GEOMETRY(LineString, 4326),
+    total_length_km NUMERIC(10, 2) DEFAULT 0,
+    capacity INT DEFAULT 0,
+    est_time_days NUMERIC(8, 2) DEFAULT 0,
+    efficiency NUMERIC(5, 4) DEFAULT 0,
+    bottleneck_ids INT[],
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_supply_route_geom ON supply_route USING GIST(geom);
+CREATE INDEX idx_supply_route_belligerent ON supply_route(belligerent);
+
+-- ==================== 军事工程与防御盲区表 ====================
+DROP TABLE IF EXISTS military_structure CASCADE;
+CREATE TABLE military_structure (
+    id SERIAL PRIMARY KEY,
+    structure_name VARCHAR(200) NOT NULL,
+    structure_type VARCHAR(50) NOT NULL CHECK (structure_type IN ('城墙', '关隘', '堡垒', '烽火台', '要塞', '寨堡', '护城河')),
+    battlefield_id INT REFERENCES battlefield(id) ON DELETE SET NULL,
+    dynasty VARCHAR(100),
+    geom GEOMETRY(Point, 4326),
+    polygon GEOMETRY(Polygon, 4326),
+    height_m NUMERIC(8, 2) DEFAULT 0,
+    length_m NUMERIC(10, 2) DEFAULT 0,
+    thickness_m NUMERIC(8, 2) DEFAULT 0,
+    material VARCHAR(50),
+    gate_count INT DEFAULT 0,
+    tower_count INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_military_structure_geom ON military_structure USING GIST(geom);
+CREATE INDEX idx_military_structure_polygon ON military_structure USING GIST(polygon);
+CREATE INDEX idx_military_structure_type ON military_structure(structure_type);
+
+DROP TABLE IF EXISTS defense_blind_zone CASCADE;
+CREATE TABLE defense_blind_zone (
+    id SERIAL PRIMARY KEY,
+    structure_id INT NOT NULL REFERENCES military_structure(id) ON DELETE CASCADE,
+    center_geom GEOMETRY(Point, 4326),
+    area_geom GEOMETRY(Polygon, 4326),
+    area_km2 NUMERIC(10, 4) DEFAULT 0,
+    direction VARCHAR(10),
+    max_distance_km NUMERIC(8, 2) DEFAULT 0,
+    visibility_pct NUMERIC(5, 4) DEFAULT 0,
+    risk_level VARCHAR(10) CHECK (risk_level IN ('低', '中', '高', '极高')),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_defense_blind_zone_structure ON defense_blind_zone(structure_id);
+CREATE INDEX idx_defense_blind_zone_geom ON defense_blind_zone USING GIST(area_geom);
+
+-- ==================== 军事思想演变节点表 ====================
+DROP TABLE IF EXISTS doctrine_evolution CASCADE;
+CREATE TABLE doctrine_evolution (
+    id SERIAL PRIMARY KEY,
+    year INT NOT NULL,
+    era_boundary VARCHAR(100),
+    before_doctrine VARCHAR(100),
+    after_doctrine VARCHAR(100),
+    change_magnitude NUMERIC(5, 4) DEFAULT 0,
+    confidence NUMERIC(5, 4) DEFAULT 0,
+    key_features TEXT[],
+    trigger_events TEXT[],
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_doctrine_evolution_year ON doctrine_evolution(year);

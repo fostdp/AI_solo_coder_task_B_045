@@ -4,19 +4,27 @@ import (
 	"net/http"
 	"strconv"
 
+	"ancient-battlefield/pkg/battle_replay"
 	"ancient-battlefield/pkg/battlefield_loader"
 	"ancient-battlefield/pkg/config"
+	"ancient-battlefield/pkg/defense_analyzer"
+	"ancient-battlefield/pkg/doctrine_evolution"
 	"ancient-battlefield/pkg/geo_partitioner"
 	"ancient-battlefield/pkg/models"
+	"ancient-battlefield/pkg/supply_analyzer"
 	"ancient-battlefield/pkg/terrain_analyzer"
 	"github.com/gin-gonic/gin"
 )
 
 type Handler struct {
-	Cfg        *config.ModelConfig
-	Loader     *battlefield_loader.Loader
-	Analyzer   *terrain_analyzer.Analyzer
-	Partitioner *geo_partitioner.Partitioner
+	Cfg           *config.ModelConfig
+	Loader        *battlefield_loader.Loader
+	Analyzer      *terrain_analyzer.Analyzer
+	Partitioner   *geo_partitioner.Partitioner
+	Replay        *battle_replay.ReplayAnalyzer
+	Supply        *supply_analyzer.SupplyAnalyzer
+	Defense       *defense_analyzer.DefenseAnalyzer
+	Doctrine      *doctrine_evolution.DoctrineAnalyzer
 }
 
 func New(cfg *config.ModelConfig) *Handler {
@@ -25,6 +33,10 @@ func New(cfg *config.ModelConfig) *Handler {
 		Loader:      battlefield_loader.New(""),
 		Analyzer:    terrain_analyzer.New(cfg),
 		Partitioner: geo_partitioner.New(cfg),
+		Replay:      battle_replay.New(cfg),
+		Supply:      supply_analyzer.New(cfg),
+		Defense:     defense_analyzer.New(cfg),
+		Doctrine:    doctrine_evolution.New(cfg),
 	}
 	_ = h.Loader.Load()
 	return h
@@ -181,6 +193,120 @@ func (h *Handler) GetStatistics(c *gin.Context) {
 		"total_roads":        len(h.Loader.GetRoads()),
 		"total_rivers":       len(h.Loader.GetRivers()),
 	})
+}
+
+func (h *Handler) findBattlefield(id int64) *models.Battlefield {
+	for _, bf := range h.Loader.GetBattlefields() {
+		if bf.ID == id {
+			b := bf
+			return &b
+		}
+	}
+	return nil
+}
+
+func (h *Handler) GetBattleReplay(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	bf := h.findBattlefield(id)
+	if bf == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+		return
+	}
+	fps, _ := strconv.Atoi(c.DefaultQuery("fps", strconv.Itoa(h.Cfg.BattleReplay.DefaultFps)))
+	result := h.Replay.GenerateBattleReplay(*bf, fps)
+	c.JSON(http.StatusOK, result)
+}
+
+func (h *Handler) GetBattleEvents(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	bf := h.findBattlefield(id)
+	if bf == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+		return
+	}
+	events := h.Replay.NLPExtractEvents(*bf)
+	c.JSON(http.StatusOK, gin.H{
+		"battlefield_id": bf.ID,
+		"battle_name":    bf.BattleName,
+		"events":         events,
+		"event_count":    len(events),
+	})
+}
+
+func (h *Handler) GetSupplyAnalysis(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	bf := h.findBattlefield(id)
+	if bf == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+		return
+	}
+	result := h.Supply.AnalyzeSupply(*bf, h.Loader.GetRoads())
+	c.JSON(http.StatusOK, result)
+}
+
+func (h *Handler) GetDefenseEvaluation(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	bf := h.findBattlefield(id)
+	if bf == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+		return
+	}
+	viewshedKm, _ := strconv.ParseFloat(c.DefaultQuery("viewshed_km",
+		strconv.FormatFloat(h.Cfg.DefenseEvaluation.DefaultViewshedKm, 'f', -1, 64)))
+	results := h.Defense.EvaluateAll(*bf, viewshedKm)
+	c.JSON(http.StatusOK, gin.H{
+		"battlefield_id": bf.ID,
+		"battle_name":    bf.BattleName,
+		"evaluations":    results,
+		"structure_count": len(results),
+	})
+}
+
+func (h *Handler) GetMilitaryStructures(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	bf := h.findBattlefield(id)
+	if bf == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+		return
+	}
+	structures := h.Defense.GenerateMilitaryStructures(*bf)
+	c.JSON(http.StatusOK, gin.H{
+		"battlefield_id": bf.ID,
+		"battle_name":    bf.BattleName,
+		"structures":     structures,
+		"count":          len(structures),
+	})
+}
+
+func (h *Handler) GetDoctrineEvolution(c *gin.Context) {
+	bfs := h.Loader.GetBattlefields()
+	result := h.Doctrine.AnalyzeEvolution(bfs)
+	c.JSON(http.StatusOK, result)
 }
 
 func (h *Handler) generateHardRegions(bfs []models.Battlefield, k int) []models.MilitaryRegion {

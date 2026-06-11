@@ -144,3 +144,209 @@ type StatsByTerrain struct {
 	Count       int     `json:"count"`
 	Percentage  float64 `json:"percentage"`
 }
+
+type DEMTile struct {
+	ID         int      `json:"id"`
+	TileX      int      `json:"tile_x"`
+	TileY      int      `json:"tile_y"`
+	TileZ      int      `json:"tile_z"`
+	MinElev    int      `json:"min_elev"`
+	MaxElev    int      `json:"max_elev"`
+	GridSize   int      `json:"grid_size"`
+	HeightGrid [][]int  `json:"height_grid"`
+}
+
+type BattleEvent struct {
+	ID             int         `json:"id"`
+	BattlefieldID  int         `json:"battlefield_id"`
+	EventOrder     int         `json:"event_order"`
+	EventType      string      `json:"event_type"`
+	EventName      string      `json:"event_name"`
+	Description    string      `json:"description"`
+	HourOffset     float64     `json:"hour_offset"`
+	Lng            float64     `json:"lng"`
+	Lat            float64     `json:"lat"`
+	Belligerent    string      `json:"belligerent"`
+	TroopCount     int         `json:"troop_count"`
+	Casualties     int         `json:"casualties"`
+	IsTurningPoint bool        `json:"is_turning_point"`
+	IsDecision     bool        `json:"is_decision"`
+	Tags           []string    `json:"tags"`
+	ExtractedFrom  string      `json:"extracted_from"`
+	NLPConfidence  float64     `json:"nlp_confidence"`
+}
+
+type CampaignTimeline struct {
+	BattlefieldID  int           `json:"battlefield_id"`
+	BattleName     string        `json:"battle_name"`
+	TotalDurationH float64       `json:"total_duration_h"`
+	Events         []BattleEvent `json:"events"`
+	TurningPoints  []BattleEvent `json:"turning_points"`
+	Decisions      []BattleEvent `json:"decisions"`
+}
+
+type AnimationFrame struct {
+	FrameIndex     int       `json:"frame_index"`
+	TimestampH     float64   `json:"timestamp_h"`
+	TimeLabel      string    `json:"time_label"`
+	TroopPositions []struct {
+		Belligerent  string    `json:"belligerent"`
+		UnitName     string    `json:"unit_name"`
+		Lng          float64   `json:"lng"`
+		Lat          float64   `json:"lat"`
+		TroopCount   int       `json:"troop_count"`
+		IconType     string    `json:"icon_type"`
+	} `json:"troop_positions"`
+	ActiveEvent    *BattleEvent `json:"active_event,omitempty"`
+	FrontLines     [][][2]float64 `json:"front_lines"`
+}
+
+type BattleReplayResult struct {
+	Timeline       CampaignTimeline  `json:"timeline"`
+	Frames         []AnimationFrame  `json:"frames"`
+	Fps            int               `json:"fps"`
+	TotalFrames    int               `json:"total_frames"`
+	NLPStats       struct {
+		TotalEvents      int     `json:"total_events"`
+		AvgConfidence    float64 `json:"avg_confidence"`
+		TurningPointCount int    `json:"turning_point_count"`
+		DecisionCount    int     `json:"decision_count"`
+	} `json:"nlp_stats"`
+}
+
+type SupplyNode struct {
+	ID             int       `json:"id"`
+	NodeName       string    `json:"node_name"`
+	NodeType       string    `json:"node_type"`
+	Belligerent    string    `json:"belligerent"`
+	Lng            float64   `json:"lng"`
+	Lat            float64   `json:"lat"`
+	Capacity       int       `json:"capacity"`
+	IsBottleneck   bool      `json:"is_bottleneck"`
+	Throughput     float64   `json:"throughput"`
+	RoadIDs        []int     `json:"road_ids"`
+}
+
+type SupplyRoute struct {
+	ID             int         `json:"id"`
+	RouteName      string      `json:"route_name"`
+	Belligerent    string      `json:"belligerent"`
+	Coords         [][2]float64 `json:"coords"`
+	RoadSegments   []int       `json:"road_segments"`
+	TotalLengthKm  float64     `json:"total_length_km"`
+	Capacity       int         `json:"capacity"`
+	EstTimeDays    float64     `json:"est_time_days"`
+	Efficiency     float64     `json:"efficiency"`
+	Nodes          []int       `json:"nodes"`
+	BottleneckIDs  []int       `json:"bottleneck_ids"`
+}
+
+type SupplyAnalysis struct {
+	BattlefieldID  int                `json:"battlefield_id"`
+	BelligerentA   string             `json:"belligerent_a"`
+	BelligerentB   string             `json:"belligerent_b"`
+	RoutesA        []SupplyRoute      `json:"routes_a"`
+	RoutesB        []SupplyRoute      `json:"routes_b"`
+	NodesA         []SupplyNode       `json:"nodes_a"`
+	NodesB         []SupplyNode       `json:"nodes_b"`
+	BottlenecksA   []SupplyNode       `json:"bottlenecks_a"`
+	BottlenecksB   []SupplyNode       `json:"bottlenecks_b"`
+	AdvantageSide  string             `json:"advantage_side"`
+	AdvantageScore float64            `json:"advantage_score"`
+}
+
+type MilitaryStructure struct {
+	ID             int         `json:"id"`
+	StructureName  string      `json:"structure_name"`
+	StructureType  string      `json:"structure_type"`
+	BattlefieldID  int         `json:"battlefield_id"`
+	Dynasty        string      `json:"dynasty"`
+	Lng            float64     `json:"lng"`
+	Lat            float64     `json:"lat"`
+	HeightM        float64     `json:"height_m"`
+	LengthM        float64     `json:"length_m"`
+	ThicknessM     float64     `json:"thickness_m"`
+	Material       string      `json:"material"`
+	GateCount      int         `json:"gate_count"`
+	TowerCount     int         `json:"tower_count"`
+	Coords         [][][2]float64 `json:"coords"`
+}
+
+type DefenseBlindZone struct {
+	ID             int         `json:"id"`
+	StructureID    int         `json:"structure_id"`
+	CenterLng      float64     `json:"center_lng"`
+	CenterLat      float64     `json:"center_lat"`
+	AreaKm2        float64     `json:"area_km2"`
+	Direction      string      `json:"direction"`
+	MaxDistanceKm  float64     `json:"max_distance_km"`
+	VisibilityPct  float64     `json:"visibility_pct"`
+	RiskLevel      string      `json:"risk_level"`
+	Coords         [][][2]float64 `json:"coords"`
+}
+
+type DefenseEvaluation struct {
+	StructureID       int                    `json:"structure_id"`
+	StructureName     string                 `json:"structure_name"`
+	OverallScore      float64                `json:"overall_score"`
+	VisibilityScore   float64                `json:"visibility_score"`
+	StructuralScore   float64                `json:"structural_score"`
+	TopographicScore  float64                `json:"topographic_score"`
+	BlindZoneCount    int                    `json:"blind_zone_count"`
+	TotalBlindAreaKm2 float64                `json:"total_blind_area_km2"`
+	AvgVisibilityPct  float64                `json:"avg_visibility_pct"`
+	BlindZones        []DefenseBlindZone     `json:"blind_zones"`
+	ViewshedSampleKm  float64                `json:"viewshed_sample_km"`
+	Recommendations   []string               `json:"recommendations"`
+}
+
+type EraDoctrineProfile struct {
+	Era            string    `json:"era"`
+	YearRange      [2]int    `json:"year_range"`
+	BattleCount    int       `json:"battle_count"`
+	AvgElevation   float64   `json:"avg_elevation"`
+	AvgDistToRoad  float64   `json:"avg_dist_to_road"`
+	AvgDistToRiver float64   `json:"avg_dist_to_river"`
+	AvgTroops      float64   `json:"avg_troops"`
+	TerrainDist    map[string]float64 `json:"terrain_dist"`
+	DominantTerrain string   `json:"dominant_terrain"`
+	DoctrineTag    string    `json:"doctrine_tag"`
+	Characteristic string    `json:"characteristic"`
+}
+
+type ChangePoint struct {
+	ID             int       `json:"id"`
+	Year           int       `json:"year"`
+	EraBoundary    string    `json:"era_boundary"`
+	BeforeDoctrine string    `json:"before_doctrine"`
+	AfterDoctrine  string    `json:"after_doctrine"`
+	ChangeMagnitude float64  `json:"change_magnitude"`
+	Confidence     float64   `json:"confidence"`
+	KeyFeatures    []string  `json:"key_features"`
+	TriggerEvents  []string  `json:"trigger_events"`
+}
+
+type DoctrineEvolutionResult struct {
+	Profiles       []EraDoctrineProfile `json:"profiles"`
+	ChangePoints   []ChangePoint        `json:"change_points"`
+	TimeAnimation  []struct {
+		Year           int                 `json:"year"`
+		Era            string              `json:"era"`
+		DoctrineTag    string              `json:"doctrine_tag"`
+		HotspotCenters [][2]float64        `json:"hotspot_centers"`
+		HeatmapData    []struct {
+			Lng   float64 `json:"lng"`
+			Lat   float64 `json:"lat"`
+			Value float64 `json:"value"`
+		} `json:"heatmap_data"`
+		Features       map[string]float64  `json:"features"`
+	} `json:"time_animation"`
+	TimeSeries     []struct {
+		Year      int     `json:"year"`
+		Elevation float64 `json:"elevation"`
+		Troops    float64 `json:"troops"`
+		RoadDist  float64 `json:"road_dist"`
+		Mobility  float64 `json:"mobility_index"`
+	} `json:"time_series"`
+	SummaryTrends  map[string]string  `json:"summary_trends"`
+}

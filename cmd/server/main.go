@@ -62,6 +62,13 @@ func main() {
 		api.GET("/military_regions", h.GetMilitaryRegions)
 		api.GET("/fuzzy_cluster", h.GetFuzzyCluster)
 		api.GET("/statistics", h.GetStatistics)
+
+		api.GET("/battle_replay/:id", h.GetBattleReplay)
+		api.GET("/battle_events/:id", h.GetBattleEvents)
+		api.GET("/supply_analysis/:id", h.GetSupplyAnalysis)
+		api.GET("/defense_evaluation/:id", h.GetDefenseEvaluation)
+		api.GET("/military_structures/:id", h.GetMilitaryStructures)
+		api.GET("/doctrine_evolution", h.GetDoctrineEvolution)
 	}
 
 	log.Printf("服务启动于 :%s (pprof=:%s, metrics=:%s)", *port, *pprofPort, *metricsPort)

@@ -35,3 +35,28 @@ terrain_profile:
 
 accessibility:
   decay_rate: 0.05
+
+battle_replay:
+  default_fps: 12
+  min_events_per_battle: 5
+  max_events_per_battle: 10
+  nlp_confidence_threshold: 0.6
+
+supply_analysis:
+  nodes_per_side: 4
+  default_speed_kmh: 15.0
+  working_hours_per_day: 12.0
+  bottleneck_percentage: 0.3
+
+defense_evaluation:
+  default_viewshed_sample_km: 8.0
+  blind_zone_visibility_threshold: 0.5
+  viewshed_directions: 36
+  structures_per_battle_min: 3
+  structures_per_battle_max: 5
+
+doctrine_evolution:
+  change_point_window: 5
+  animation_sample_count: 24
+  time_series_step_battles: 5
+  time_series_window: 30

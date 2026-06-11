@@ -53,6 +53,18 @@
                     <input type="checkbox" id="toggle-highprob" />
                     <span>高概率战场区域</span>
                 </label>
+                <label class="toggle-label">
+                    <input type="checkbox" id="toggle-supply" />
+                    <span>后勤补给路线</span>
+                </label>
+                <label class="toggle-label">
+                    <input type="checkbox" id="toggle-structures" />
+                    <span>军事工程</span>
+                </label>
+                <label class="toggle-label">
+                    <input type="checkbox" id="toggle-blindzones" />
+                    <span>防御盲区</span>
+                </label>
             </div>
 
             <div class="sidebar-section">
@@ -177,6 +189,62 @@
                 <button id="btn-analyze" class="btn-primary">运行军事地理分区</button>
                 <button id="btn-highprob" class="btn-secondary">分析高概率区域</button>
             </div>
+
+            <div class="sidebar-section">
+                <h3>战役进程时空回放</h3>
+                <div class="replay-controls">
+                    <button id="btn-replay" class="btn-primary">生成战役回放</button>
+                    <div class="timeline-container hidden" id="replay-timeline-container">
+                        <div class="timeline-info">
+                            <span id="replay-time-label">T+00:00</span>
+                            <span id="replay-event-name">-</span>
+                        </div>
+                        <div class="timeline-slider-wrapper">
+                            <input type="range" id="replay-timeline" min="0" max="100" value="0" />
+                        </div>
+                        <div class="timeline-buttons">
+                            <button id="btn-replay-prev" class="btn-small">⏮</button>
+                            <button id="btn-replay-play" class="btn-small">▶</button>
+                            <button id="btn-replay-next" class="btn-small">⏭</button>
+                            <select id="replay-fps">
+                                <option value="8">8fps</option>
+                                <option value="12" selected>12fps</option>
+                                <option value="24">24fps</option>
+                            </select>
+                        </div>
+                        <div class="event-list" id="replay-event-list"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>后勤补给与防御评估</h3>
+                <button id="btn-supply" class="btn-secondary">分析补给路线</button>
+                <button id="btn-defense" class="btn-secondary">评估防御效能</button>
+                <div id="supply-info" class="supply-info hidden"></div>
+                <div id="defense-info" class="defense-info hidden"></div>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>跨朝代军事思想演变</h3>
+                <button id="btn-doctrine" class="btn-primary">分析军事思想演变</button>
+                <div class="evolution-controls hidden" id="evolution-controls">
+                    <div class="timeline-info">
+                        <span id="evolution-year">年份: -</span>
+                        <span id="evolution-era">年代: -</span>
+                    </div>
+                    <div class="timeline-slider-wrapper">
+                        <input type="range" id="evolution-timeline" min="0" max="100" value="0" />
+                    </div>
+                    <div class="timeline-buttons">
+                        <button id="btn-evolution-prev" class="btn-small">⏮</button>
+                        <button id="btn-evolution-play" class="btn-small">▶</button>
+                        <button id="btn-evolution-next" class="btn-small">⏭</button>
+                    </div>
+                    <div id="doctrine-info" class="doctrine-info"></div>
+                    <canvas id="chart-timeseries" width="260" height="180"></canvas>
+                </div>
+            </div>
         </aside>
 
         <main class="map-container">
@@ -209,16 +277,41 @@
                         <h4>交通可达性分析</h4>
                         <div id="accessibility-info" class="accessibility-grid"></div>
                     </div>
+
+                    <div class="panel-section">
+                        <h4>战役事件时间轴</h4>
+                        <div id="battle-events" class="battle-events">
+                            <div class="loading">点击「生成战役回放」加载</div>
+                        </div>
+                    </div>
+
+                    <div class="panel-section">
+                        <h4>后勤补给分析</h4>
+                        <div id="panel-supply-info" class="supply-panel-info">
+                            <div class="loading">点击「分析补给路线」加载</div>
+                        </div>
+                    </div>
+
+                    <div class="panel-section">
+                        <h4>军事工程防御评估</h4>
+                        <div id="panel-defense-info" class="defense-panel-info">
+                            <div class="loading">点击「评估防御效能」加载</div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </main>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="js/data.js?v=20260611"></script>
-    <script src="js/terrain_profile.js?v=20260611"></script>
-    <script src="js/charts.js?v=20260611"></script>
-    <script src="js/battlefield_map.js?v=20260611"></script>
-    <script src="js/app.js?v=20260611"></script>
+    <script src="js/data.js?v=20260612"></script>
+    <script src="js/terrain_profile.js?v=20260612"></script>
+    <script src="js/charts.js?v=20260612"></script>
+    <script src="js/battlefield_map.js?v=20260612"></script>
+    <script src="js/battle_replay.js?v=20260612"></script>
+    <script src="js/supply_visualization.js?v=20260612"></script>
+    <script src="js/defense_visualization.js?v=20260612"></script>
+    <script src="js/doctrine_evolution.js?v=20260612"></script>
+    <script src="js/app.js?v=20260612"></script>
 </body>
 </html>

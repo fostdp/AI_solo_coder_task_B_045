@@ -15,6 +15,39 @@ type ModelConfig struct {
 	HighProbArea       HPConfig       `yaml:"high_prob_area"`
 	TerrainProfile     TPConfig       `yaml:"terrain_profile"`
 	Accessibility      AccessConfig   `yaml:"accessibility"`
+	BattleReplay       ReplayConfig   `yaml:"battle_replay"`
+	SupplyAnalysis     SupplyConfig   `yaml:"supply_analysis"`
+	DefenseEvaluation  DefenseConfig  `yaml:"defense_evaluation"`
+	DoctrineEvolution  EvolutionConfig `yaml:"doctrine_evolution"`
+}
+
+type ReplayConfig struct {
+	DefaultFps   int     `yaml:"default_fps"`
+	MinEvents    int     `yaml:"min_events_per_battle"`
+	MaxEvents    int     `yaml:"max_events_per_battle"`
+	NLPConfidenceThreshold float64 `yaml:"nlp_confidence_threshold"`
+}
+
+type SupplyConfig struct {
+	NodesPerSide       int     `yaml:"nodes_per_side"`
+	DefaultSpeedKmh    float64 `yaml:"default_speed_kmh"`
+	WorkingHoursPerDay float64 `yaml:"working_hours_per_day"`
+	BottleneckPct      float64 `yaml:"bottleneck_percentage"`
+}
+
+type DefenseConfig struct {
+	DefaultViewshedKm  float64 `yaml:"default_viewshed_sample_km"`
+	BlindZoneThreshold float64 `yaml:"blind_zone_visibility_threshold"`
+	NumDirections      int     `yaml:"viewshed_directions"`
+	StructureCountMin  int     `yaml:"structures_per_battle_min"`
+	StructureCountMax  int     `yaml:"structures_per_battle_max"`
+}
+
+type EvolutionConfig struct {
+	ChangePointWindow  int     `yaml:"change_point_window"`
+	SampleAnimationYears int   `yaml:"animation_sample_count"`
+	TimeSeriesStep     int     `yaml:"time_series_step_battles"`
+	TimeSeriesWindow   int     `yaml:"time_series_window"`
 }
 
 type LRConfig struct {
@@ -100,6 +133,31 @@ var DefaultConfig = ModelConfig{
 	},
 	Accessibility: AccessConfig{
 		DecayRate: 0.05,
+	},
+	BattleReplay: ReplayConfig{
+		DefaultFps:   12,
+		MinEvents:    5,
+		MaxEvents:    10,
+		NLPConfidenceThreshold: 0.6,
+	},
+	SupplyAnalysis: SupplyConfig{
+		NodesPerSide:       4,
+		DefaultSpeedKmh:    15.0,
+		WorkingHoursPerDay: 12.0,
+		BottleneckPct:      0.3,
+	},
+	DefenseEvaluation: DefenseConfig{
+		DefaultViewshedKm:  8.0,
+		BlindZoneThreshold: 0.5,
+		NumDirections:      36,
+		StructureCountMin:  3,
+		StructureCountMax:  5,
+	},
+	DoctrineEvolution: EvolutionConfig{
+		ChangePointWindow:  5,
+		SampleAnimationYears: 24,
+		TimeSeriesStep:     5,
+		TimeSeriesWindow:   30,
 	},
 }
 
