@@ -4,14 +4,14 @@ import (
 	"net/http"
 	"strconv"
 
-	"ancient-battlefield/pkg/battle_replay"
+	"ancient-battlefield/pkg/battle_replayer"
 	"ancient-battlefield/pkg/battlefield_loader"
 	"ancient-battlefield/pkg/config"
-	"ancient-battlefield/pkg/defense_analyzer"
-	"ancient-battlefield/pkg/doctrine_evolution"
+	"ancient-battlefield/pkg/defense_evaluator"
+	"ancient-battlefield/pkg/tactical_evolution"
 	"ancient-battlefield/pkg/geo_partitioner"
 	"ancient-battlefield/pkg/models"
-	"ancient-battlefield/pkg/supply_analyzer"
+	"ancient-battlefield/pkg/logistics_analyzer"
 	"ancient-battlefield/pkg/terrain_analyzer"
 	"github.com/gin-gonic/gin"
 )
@@ -21,10 +21,10 @@ type Handler struct {
 	Loader        *battlefield_loader.Loader
 	Analyzer      *terrain_analyzer.Analyzer
 	Partitioner   *geo_partitioner.Partitioner
-	Replay        *battle_replay.ReplayAnalyzer
-	Supply        *supply_analyzer.SupplyAnalyzer
-	Defense       *defense_analyzer.DefenseAnalyzer
-	Doctrine      *doctrine_evolution.DoctrineAnalyzer
+	Replay        *battle_replayer.ReplayAnalyzer
+	Supply        *logistics_analyzer.SupplyAnalyzer
+	Defense       *defense_evaluator.DefenseAnalyzer
+	Doctrine      *tactical_evolution.DoctrineAnalyzer
 }
 
 func New(cfg *config.ModelConfig) *Handler {
@@ -33,10 +33,10 @@ func New(cfg *config.ModelConfig) *Handler {
 		Loader:      battlefield_loader.New(""),
 		Analyzer:    terrain_analyzer.New(cfg),
 		Partitioner: geo_partitioner.New(cfg),
-		Replay:      battle_replay.New(cfg),
-		Supply:      supply_analyzer.New(cfg),
-		Defense:     defense_analyzer.New(cfg),
-		Doctrine:    doctrine_evolution.New(cfg),
+		Replay:      battle_replayer.New(cfg),
+		Supply:      logistics_analyzer.New(cfg),
+		Defense:     defense_evaluator.New(cfg),
+		Doctrine:    tactical_evolution.New(cfg),
 	}
 	_ = h.Loader.Load()
 	return h
@@ -217,7 +217,7 @@ func (h *Handler) GetBattleReplay(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 		return
 	}
-	fps, _ := strconv.Atoi(c.DefaultQuery("fps", strconv.Itoa(h.Cfg.BattleReplay.DefaultFps)))
+	fps, _ := strconv.Atoi(c.DefaultQuery("fps", strconv.Itoa(h.Cfg.BattleReplayer.DefaultFps)))
 	result := h.Replay.GenerateBattleReplay(*bf, fps)
 	c.JSON(http.StatusOK, result)
 }
@@ -272,7 +272,7 @@ func (h *Handler) GetDefenseEvaluation(c *gin.Context) {
 		return
 	}
 	viewshedKm, _ := strconv.ParseFloat(c.DefaultQuery("viewshed_km",
-		strconv.FormatFloat(h.Cfg.DefenseEvaluation.DefaultViewshedKm, 'f', -1, 64)))
+		strconv.FormatFloat(h.Cfg.DefenseEvaluator.DefaultViewshedKm, 'f', -1, 64)))
 	results := h.Defense.EvaluateAll(*bf, viewshedKm)
 	c.JSON(http.StatusOK, gin.H{
 		"battlefield_id": bf.ID,
